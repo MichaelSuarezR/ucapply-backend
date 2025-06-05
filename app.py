@@ -1,36 +1,43 @@
 from flask import Flask, request, jsonify
-import requests
+import smtplib
+import ssl
+import random
+import os
 
 app = Flask(__name__)
 
-@app.route("/internships", methods=["GET"])
-def internships():
+VERIFICATION_CODES = {}
+
+@app.route("/send-code", methods=["POST"])
+def send_code():
+    data = request.get_json()
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"error": "No email provided"}), 400
+
+    code = str(random.randint(100000, 999999))
+    VERIFICATION_CODES[email] = code
+
     try:
-        city = request.args.get("city", "").lower()
-        search = request.args.get("search", "intern").lower()
-
-        response = requests.get("https://www.arbeitnow.com/api/job-board-api")
-        jobs = response.json().get("data", [])
-
-        search_terms = search.split()
-        filtered = [
-            {
-                    "title": job["title"],
-                    "company": job["company_name"],
-                    "location": job.get("location", ""),
-                    "url": job.get("url", "")
-    }
-    for job in jobs
-    if any(term in job["title"].lower() for term in search_terms)
-]
-
-        print(f"✅ Returning {len(filtered)} internships for '{search}'")
-        return jsonify(filtered)
-
+        send_verification_email(email, code)
+        return jsonify({"message": f"Verification code sent to {email}"}), 200
     except Exception as e:
-        print("❌ Backend error:", e)
+        print("❌ Email error:", e)
         return jsonify({"error": str(e)}), 500
 
-if __name__ == "__main__":
-    from waitress import serve
-    serve(app, host="0.0.0.0", port=10000)
+def send_verification_email(to_email, code):
+    sender = os.environ.get("SENDER_EMAIL")
+    password = os.environ.get("SENDER_PASSWORD")
+    
+    if not sender or not password:
+        raise Exception("Missing sender email or password environment variable")
+
+    subject = "Your UCApply Verification Code"
+    body = f"Your UCApply verification code is: {code}"
+    msg = f"Subject: {subject}\n\n{body}"
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(sender, password)
+        server.sendmail(sender, to_email, msg)
