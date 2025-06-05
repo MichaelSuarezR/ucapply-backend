@@ -6,6 +6,7 @@ import os
 
 app = Flask(__name__)
 
+# In-memory store for email → code
 VERIFICATION_CODES = {}
 
 @app.route("/send-code", methods=["POST"])
@@ -25,6 +26,22 @@ def send_code():
     except Exception as e:
         print("❌ Email error:", e)
         return jsonify({"error": str(e)}), 500
+
+@app.route("/verify-code", methods=["POST"])
+def verify_code():
+    data = request.get_json()
+    email = data.get("email")
+    code = data.get("code")
+
+    if not email or not code:
+        return jsonify({"success": False, "error": "Email and code required"}), 400
+
+    expected_code = VERIFICATION_CODES.get(email)
+
+    if expected_code == code:
+        return jsonify({"success": True})
+    else:
+        return jsonify({"success": False, "error": "Invalid verification code"}), 400
 
 def send_verification_email(to_email, code):
     sender = os.environ.get("SENDER_EMAIL")
