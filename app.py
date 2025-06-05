@@ -46,7 +46,7 @@ def verify_code():
     if datetime.utcnow() - saved_time > timedelta(minutes=2):
         return jsonify({"success": False, "error": "Code expired"}), 400
 
-    if saved_code != code:
+    if str(saved_code) != str(code):
         return jsonify({"success": False, "error": "Incorrect code"}), 400
 
     print("⏳ Stored:", CODES_DB)
