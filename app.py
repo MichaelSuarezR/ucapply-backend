@@ -49,6 +49,9 @@ def verify_code():
     if saved_code != code:
         return jsonify({"success": False, "error": "Incorrect code"}), 400
 
+    print("⏳ Stored:", CODES_DB)
+    print("📩 Received:", email, code)
+
     return jsonify({"success": True})
 
 def send_verification_email(to_email, code):
