@@ -7,7 +7,9 @@ import os
 app = Flask(__name__)
 
 # In-memory store for email → code
-VERIFICATION_CODES = {}
+from datetime import datetime, timedelta
+
+CODES_DB = {}  # email → (code, timestamp)
 
 @app.route("/send-code", methods=["POST"])
 def send_code():
@@ -18,7 +20,7 @@ def send_code():
         return jsonify({"error": "No email provided"}), 400
 
     code = str(random.randint(100000, 999999))
-    VERIFICATION_CODES[email] = code
+    CODES_DB[email] = (code, datetime.utcnow())
 
     try:
         send_verification_email(email, code)
@@ -34,14 +36,20 @@ def verify_code():
     code = data.get("code")
 
     if not email or not code:
-        return jsonify({"success": False, "error": "Email and code required"}), 400
+        return jsonify({"success": False, "error": "Missing fields"}), 400
 
-    expected_code = VERIFICATION_CODES.get(email)
+    saved = CODES_DB.get(email)
+    if not saved:
+        return jsonify({"success": False, "error": "No code found"}), 400
 
-    if expected_code == code:
-        return jsonify({"success": True})
-    else:
-        return jsonify({"success": False, "error": "Invalid verification code"}), 400
+    saved_code, saved_time = saved
+    if datetime.utcnow() - saved_time > timedelta(minutes=2):
+        return jsonify({"success": False, "error": "Code expired"}), 400
+
+    if saved_code != code:
+        return jsonify({"success": False, "error": "Incorrect code"}), 400
+
+    return jsonify({"success": True})
 
 def send_verification_email(to_email, code):
     sender = os.environ.get("SENDER_EMAIL")
