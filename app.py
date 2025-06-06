@@ -69,3 +69,51 @@ def send_verification_email(to_email, code):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(sender, password)
         server.sendmail(sender, to_email, msg)
+
+RESET_CODES = {}  # email → (code, timestamp)
+
+@app.route("/send-reset-code", methods=["POST"])
+def send_reset_code():
+    data = request.get_json()
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"error": "No email provided"}), 400
+
+    code = str(random.randint(100000, 999999))
+    RESET_CODES[email] = (code, datetime.utcnow())
+
+    try:
+        send_verification_email(email, code)
+        return jsonify({"message": f"Reset code sent to {email}"}), 200
+    except Exception as e:
+        print("❌ Reset email error:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json()
+    email = data.get("email")
+    code = data.get("code")
+    new_password = data.get("newPassword")
+
+    if not all([email, code, new_password]):
+        return jsonify({"success": False, "error": "Missing fields"}), 400
+
+    saved = RESET_CODES.get(email)
+    if not saved:
+        return jsonify({"success": False, "error": "No reset code found"}), 400
+
+    saved_code, saved_time = saved
+    if datetime.utcnow() - saved_time > timedelta(minutes=5):
+        return jsonify({"success": False, "error": "Reset code expired"}), 400
+
+    if str(saved_code) != str(code):
+        return jsonify({"success": False, "error": "Incorrect code"}), 400
+
+    try:
+        # Replace with actual user account update logic if persistent storage
+        print(f"🔐 Password for {email} would be updated to: {new_password}")
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
