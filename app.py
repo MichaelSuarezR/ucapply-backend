@@ -118,33 +118,36 @@ def reset_password():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-import requests
 from flask import Flask, request, jsonify
+import requests
+
+app = Flask(__name__)
 
 @app.route("/internships", methods=["GET"])
 def internships():
     try:
         city = request.args.get("city", "")
-        search = request.args.get("search", "intern")
+        response = requests.get("https://www.arbeitnow.com/api/job-board-api")
+        jobs = response.json().get("data", [])
 
-        url = f"https://remotive.io/api/remote-jobs?search={search}+intern"
-        response = requests.get(url)
-        jobs = response.json().get("jobs", [])
-
+        # Filter jobs with 'intern' or 'internship' in title
         filtered = [
             {
                 "title": job["title"],
-                "company": job["company_name"]
+                "company": job["company_name"],
+                "location": job.get("location", ""),
+                "url": job.get("url", "")
             }
             for job in jobs
-            if city.lower() in job["candidate_required_location"].lower()
-               or "anywhere" in job["candidate_required_location"].lower()
-               or city.lower() in job["title"].lower()
+            if "intern" in job["title"].lower() or "internship" in job["title"].lower()
         ]
 
-        print(f"🎯 {len(filtered)} internships matched for '{search}' in '{city}'")
+        print(f"✅ Returning {len(filtered)} internships")
         return jsonify(filtered)
 
     except Exception as e:
-        print("❌ Internship fetch error:", e)
+        print("❌ Backend error:", e)
         return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True)
