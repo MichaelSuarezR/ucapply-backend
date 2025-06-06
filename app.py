@@ -117,3 +117,34 @@ def reset_password():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+import requests
+from flask import Flask, request, jsonify
+
+@app.route("/internships", methods=["GET"])
+def internships():
+    try:
+        city = request.args.get("city", "")
+        search = request.args.get("search", "intern")
+
+        url = f"https://remotive.io/api/remote-jobs?search={search}+intern"
+        response = requests.get(url)
+        jobs = response.json().get("jobs", [])
+
+        filtered = [
+            {
+                "title": job["title"],
+                "company": job["company_name"]
+            }
+            for job in jobs
+            if city.lower() in job["candidate_required_location"].lower()
+               or "anywhere" in job["candidate_required_location"].lower()
+               or city.lower() in job["title"].lower()
+        ]
+
+        print(f"🎯 {len(filtered)} internships matched for '{search}' in '{city}'")
+        return jsonify(filtered)
+
+    except Exception as e:
+        print("❌ Internship fetch error:", e)
+        return jsonify({"error": str(e)}), 500
